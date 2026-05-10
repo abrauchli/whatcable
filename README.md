@@ -1,189 +1,42 @@
-# WhatCable
+# whatcable has moved to **[usbeehive](https://github.com/abrauchli/usbeehive)** 🐝
 
-> **What can this USB cable actually do?**
+This crate was previously published on crates.io as
+[`whatcable`](https://crates.io/crates/whatcable). To avoid collisions with the
+original WhatCable repo by Darryl Morley, the project has been renamed.
 
-A command-line tool, and a Rust library, that tell you in plain English
-what each USB device plugged into your Linux machine can actually do.
+Big thanks to Darryl for both the original work.
 
-**WhatCable is a Linux port of [WhatCable](https://github.com/darrylmorley/whatcable),
-a macOS menu-bar app by [Darryl Morley](https://github.com/darrylmorley).**
-This port covers all USB devices, not just USB-C, while preserving the
-rich USB-C Power Delivery diagnostics from the original.
+## New home
 
-The Rust rewrite is forked from
-[Zetaphor/whatcable-linux](https://github.com/Zetaphor/whatcable-linux)
-(originally C++ / CMake).
+- **crates.io:** [`usbeehive`](https://crates.io/crates/usbeehive)
+- **GitHub:** <https://github.com/abrauchli/usbeehive>
+- **Install:** `cargo install usbeehive`
 
-## What it shows
+The full git history is preserved at the new repo. This repository is
+archived and read-only.
 
-### All USB devices
-- **Identity**: vendor, product name, serial number
-- **Speed**: negotiated link speed (1.5 Mbps to 20 Gbps)
-- **USB version**: 1.1, 2.0, 3.0, 3.1, 3.2
-- **Power draw**: how much power the device is consuming
-- **Device type**: HID, Audio, Mass Storage, Hub, etc.
-- **Driver**: which kernel driver is handling the device
-- **Topology**: hub hierarchy showing what's plugged into what
+## What changed
 
-### USB-C ports (additional detail)
-- **Port roles**: data role (host/device), power role (source/sink)
-- **Cable e-marker info**: cable speed capability, current rating (3A/5A), active vs passive, cable vendor
-- **Charger PDO list**: every voltage / current profile the charger advertises, with the active profile highlighted
-- **Charging diagnostics**: identifies bottlenecks — cable limiting speed, charger undersized, etc.
-- **Live wattage** (UCSI): `voltage_now × current_now`, exposed as `negotiatedPowerMW` in JSON output and via `TypeCPowerSupply::negotiated_power_mw()` in the library.
-- **Partner identity**: decoded from PD Discover Identity VDOs
+| Old (`whatcable` 0.4.x) | New (`usbeehive` 0.5.x) |
+| --- | --- |
+| Crate `whatcable` | Crate `usbeehive` |
+| CLI `whatcable` | CLI `usbeehive` |
+| Daemon `whatcabled` | Daemon `usbeehived` |
+| D-Bus `org.whatcable.Devices1` | D-Bus `org.usbeehive.Devices1` |
+| `github.com/abrauchli/whatcable` | `github.com/abrauchli/usbeehive` |
 
-## Install
-
-### From crates.io
-
-```bash
-cargo install whatcable
-```
-
-### Build from source
-
-Requires Rust 1.85+ ([rustup](https://rustup.rs)) and `libudev` development
-headers (for `--watch` hotplug support, on by default).
-
-```bash
-# Ubuntu / Debian
-sudo apt install libudev-dev pkg-config
-
-# Fedora
-sudo dnf install systemd-devel pkgconf-pkg-config
-
-# Arch / Manjaro
-sudo pacman -S --needed systemd-libs pkgconf
-```
-
-```bash
-cargo build --release                                  # default (with --watch)
-cargo build --release --no-default-features --features cli,sysfs    # no libudev
-sudo install -Dm755 target/release/whatcable /usr/local/bin/whatcable
-```
-
-### Tests
-
-```bash
-cargo test                                # full suite (requires libudev-dev)
-cargo test --no-default-features          # pure-decoder subset, no libudev
-```
-
-## CLI usage
-
-```bash
-whatcable                                  # human-readable summary of every USB device
-whatcable --json                           # structured JSON output
-whatcable --watch                          # stream updates as devices come and go
-whatcable --raw                            # include raw sysfs attributes
-whatcable --sysfs-root /tmp/fixture-root   # run against a captured tree (testing)
-whatcable --version
-whatcable --help
-```
-
-## Library usage
-
-The crate has three optional layers, each behind a Cargo feature so
-consumers pull in only what they need.
-
-| Feature | Default | Adds |
-|---|---|---|
-| (none) | always | Data types, USB-PD VDO decoders, diagnostics, summaries — IO-free. |
-| `sysfs` | yes | `Sysfs` handle + `DeviceManager` — Linux `/sys` enumeration with injectable root. |
-| `watch` | yes | libudev hotplug monitor: `watch::Watcher` + `watch::run_loop`. |
-| `cli` | yes | The `whatcable` binary (clap + JSON / text rendering). |
-
-Library-only consumers can drop the binary deps:
-
-```toml
-# Pure decoders, no IO, no libudev:
-whatcable = { version = "0.3", default-features = false }
-
-# Add /sys enumeration:
-whatcable = { version = "0.3", default-features = false, features = ["sysfs"] }
-
-# Add hotplug too:
-whatcable = { version = "0.3", default-features = false, features = ["watch"] }
-```
-
-### Decode a Cable VDO
-
-```rust
-use whatcable::pd::{decode_cable_vdo, CableSpeed, CableCurrent};
-
-let v = decode_cable_vdo(2 | (2 << 5) | (3 << 9), false);
-assert_eq!(v.speed, CableSpeed::Usb32Gen2);
-assert_eq!(v.current_rating, CableCurrent::FiveAmp);
-assert_eq!(v.max_watts, 250);
-```
-
-### Enumerate the system's USB tree
-
-```rust,no_run
-use whatcable::DeviceManager;
-
-let mut mgr = DeviceManager::new();
-mgr.refresh();
-for s in mgr.devices() {
-    println!("{}: {}", s.headline, s.subtitle);
-}
-```
-
-### Run a debounced render loop on hotplug events
-
-```rust,no_run
-use std::time::Duration;
-use whatcable::{watch::run_loop, DeviceManager};
-
-let mut mgr = DeviceManager::new();
-run_loop(Duration::from_millis(500), |_reason| {
-    mgr.refresh();
-    println!("snapshot has {} devices", mgr.devices().len());
-    Ok(())
-}).unwrap();
-```
-
-See [`examples/`](examples) for more.
-
-## How it works
-
-WhatCable reads three areas of the Linux sysfs filesystem. No root access
-required for basic info:
-
-| sysfs path | Provides |
-|---|---|
-| `/sys/bus/usb/devices/` | All USB devices: vendor, product, speed, power, class, interfaces, topology |
-| `/sys/class/typec/` | USB-C port state: connection, roles, cable e-marker, partner identity |
-| `/sys/class/usb_power_delivery/` | PD negotiation: PDO list from charger, active profile, PPS ranges |
-| `/sys/class/power_supply/ucsi-source-psy-*` | Live `voltage_now × current_now` charging readout |
-
-Hotplug uses `libudev` to detect connect/disconnect events in real time.
-
-Cable speed and power decoding follow the USB Power Delivery 3.x spec,
-ported from the original WhatCable's Swift implementation.
-
-## Caveats
-
-- **USB-C / PD data availability varies by hardware.** The Type-C connector
-  class and USB PD sysfs interfaces depend on the kernel driver
-  (UCSI, TCPM, platform-specific). Some systems expose full PD negotiation
-  data; others expose only basic port info or nothing at all.
-- **Cable e-marker info only appears for cables that carry one.** Same as
-  the original — most USB-C cables under 60W are unmarked.
-- **WhatCable trusts the e-marker.** Counterfeit or mis-flashed cables can
-  lie about their capabilities.
-- **Vendor name lookup is not exhaustive.** Common vendors are recognized;
-  others show the hex VID.
+The library API is otherwise unchanged from `whatcable 0.4.0` plus the
+new D-Bus daemon. See the
+[`usbeehive` CHANGELOG](https://github.com/abrauchli/usbeehive/blob/master/CHANGELOG.md)
+for full migration notes.
 
 ## Credits
 
-Upstream Linux/KDE codebase: [Zetaphor/whatcable-linux](https://github.com/Zetaphor/whatcable-linux).
-
-WhatCable is a port of [WhatCable](https://github.com/darrylmorley/whatcable)
-by [Darryl Morley](https://github.com/darrylmorley). The USB Power Delivery
-decoding logic, charging diagnostics, vendor database, and plain-English
-summary approach are derived from the original macOS app.
+usbeehive (and `whatcable` before it) is a Linux port of
+[WhatCable](https://github.com/darrylmorley/whatcable) — a macOS menu-bar
+app by [Darryl Morley](https://github.com/darrylmorley). The Rust rewrite
+was forked from
+[Zetaphor/whatcable-linux](https://github.com/Zetaphor/whatcable-linux).
 
 ## License
 
