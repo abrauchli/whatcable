@@ -2,9 +2,15 @@
 
 This crate was previously published on crates.io as
 [`whatcable`](https://crates.io/crates/whatcable). To avoid collisions with the
-original WhatCable repo by Darryl Morley, the project has been renamed.
+[original WhatCable repo](https://github.com/darrylmorley/whatcable) by Darryl
+Morley, the project has been renamed.
 
-Big thanks to Darryl for both the original work.
+Big thanks to Darryl for the original work!
+
+## Original Project
+
+[WhatCable (macOS)](https://github.com/darrylmorley/whatcable) by Darryl
+Morley — the macOS menu-bar app this Rust port is derived from.
 
 ## New home
 
